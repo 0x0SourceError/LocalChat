@@ -38,6 +38,7 @@
             // 
             // rtbConsole
             // 
+            rtbConsole.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             rtbConsole.BorderStyle = BorderStyle.FixedSingle;
             rtbConsole.Location = new Point(12, 12);
             rtbConsole.Name = "rtbConsole";
@@ -48,6 +49,7 @@
             // 
             // label1
             // 
+            label1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             label1.AutoSize = true;
             label1.Location = new Point(12, 243);
             label1.Name = "label1";
@@ -57,6 +59,7 @@
             // 
             // txtInput
             // 
+            txtInput.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             txtInput.Location = new Point(56, 239);
             txtInput.Name = "txtInput";
             txtInput.Size = new Size(360, 23);
@@ -64,6 +67,7 @@
             // 
             // btnSend
             // 
+            btnSend.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             btnSend.Location = new Point(422, 239);
             btnSend.Name = "btnSend";
             btnSend.Size = new Size(75, 23);
@@ -74,6 +78,7 @@
             // 
             // btnExit
             // 
+            btnExit.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             btnExit.Location = new Point(503, 239);
             btnExit.Name = "btnExit";
             btnExit.Size = new Size(75, 23);
@@ -96,6 +101,7 @@
             Controls.Add(txtInput);
             Controls.Add(label1);
             Controls.Add(rtbConsole);
+            MinimumSize = new Size(608, 319);
             Name = "frmLocalChat";
             Text = "Local Chat";
             Load += frmLocalChat_Load;
