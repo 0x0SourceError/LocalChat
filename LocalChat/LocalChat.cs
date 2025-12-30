@@ -8,7 +8,6 @@ namespace LocalChat
 {
     public partial class frmLocalChat : Form
     {
-        IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
         TcpClient? client;
 
         public frmLocalChat()
@@ -18,7 +17,7 @@ namespace LocalChat
 
         private void frmLocalChat_Load(object sender, EventArgs e)
         {
-            rtbConsole.Text = "Connect to port: ";
+            rtbConsole.Text = "Connect to server (IP:port): ";
         }
 
         private async void btnSend_Click(object sender, EventArgs e)
@@ -38,10 +37,22 @@ namespace LocalChat
         void ConnectToServer(string response)
         {
             rtbConsole.Text += response;
-            int port = CheckPort();
-
-            if (port == -1)
+            string[] parameters = txtInput.Text.Split(":");
+            if (parameters.Length != 2)
+            {
+                rtbConsole.Text += "\nConnection string should be in (IP:port) format. (Ex: 192.168.1.1:6000)";
+                rtbConsole.Text += "\n\nConnect to server (IP:port):";
                 return;
+            }
+
+            IPAddress ipAddress = CheckIPAddress(parameters[0]);
+            int port = CheckPort(parameters[1]);
+
+            if (ipAddress == IPAddress.None || port == -1)
+            {
+                rtbConsole.Text += "\n\nConnect to server (IP:port):";
+                return;
+            }
 
             try
             {
@@ -64,8 +75,9 @@ namespace LocalChat
         {
             try
             {
-                // Send a message to the server in a asycnronous manner
                 byte[] data = Encoding.ASCII.GetBytes(txtInput.Text);
+
+                // Send a message to the server in a asycnronous manner
                 await stream.WriteAsync(data, 0, data.Length);
                 txtInput.Text = string.Empty;
             }
@@ -75,17 +87,28 @@ namespace LocalChat
             }
         }
 
-        int CheckPort()
+        int CheckPort(string num)
         {
-            bool validPort = int.TryParse(txtInput.Text, out int port);
+            bool validPort = int.TryParse(num, out int port);
             if (!validPort || port <= 0)
             {
                 rtbConsole.Text += "\nIncorrect port value.";
-                rtbConsole.Text += "\n\nConnect to port: ";
                 return -1;
             }
 
             return port;
+        }
+
+        IPAddress CheckIPAddress(string ip)
+        {
+            bool validIPAddress = IPAddress.TryParse(ip, out IPAddress? address);
+            if (!validIPAddress)
+            {
+                rtbConsole.Text += "\nIncorrect IP address.";
+                return IPAddress.None;
+            }
+
+            return address;
         }
 
         private void btnExit_Click(object sender, EventArgs e)
@@ -101,8 +124,11 @@ namespace LocalChat
                 if (client == null)
                     break;
 
+                // This Read() is done within a asyncronous background worker
                 int data = client.GetStream().Read(buffer, 0, buffer.Length);
                 string response = Encoding.ASCII.GetString(buffer, 0, data);
+
+                // The GUI item is being accessed from a different thread so Invoke() is used
                 rtbConsole.Invoke(() => rtbConsole.Text += "\n[CLIENT]: " + response);
             }
         }

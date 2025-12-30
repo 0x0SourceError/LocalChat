@@ -6,7 +6,6 @@ namespace LocalChat.Server
 {
     internal class LocalChatServer
     {
-        static IPAddress ipAddress = IPAddress.Parse("127.0.0.1");
         static List<TcpClient> clients = new List<TcpClient>();
         async static Task Main(string[] args)
         {
@@ -23,12 +22,13 @@ namespace LocalChat.Server
                     break;
             }
 
-            using TcpListener server = new TcpListener(ipAddress, port);
+            using TcpListener server = new TcpListener(IPAddress.Any, port);
             try
             {
                 server.Start();
-                Console.WriteLine("> Created server at port: " + port);
-                Console.WriteLine("> Waiting for clients");
+                IPAddress address = await NetworkUtils.GetServerIPAddressAsync();
+                Console.WriteLine("Created server at IP: " + address.ToString() + " and Port: " + port);
+                Console.WriteLine("Waiting for clients...");
 
                 // Listen for clients in a asynchronous manner
                 await HostSessionAsync(server);
@@ -48,10 +48,11 @@ namespace LocalChat.Server
             while (true)
             {
                 // When a client connects add them to a list of connected clients
-                // Handle each client respectively
                 TcpClient client = await server.AcceptTcpClientAsync();
                 Console.WriteLine("Client connected!");
                 clients.Add(client);
+
+                // Handle each client respectively
                 _ = HandleClientAsync(client);
             }
         }
@@ -86,6 +87,7 @@ namespace LocalChat.Server
             }
             finally
             {
+                // Terminate the connection and remove the client from the list of clients
                 client.Close();
                 clients.Remove(client);
             }
