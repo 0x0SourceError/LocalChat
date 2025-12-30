@@ -34,7 +34,7 @@ namespace LocalChat
             await SendMessageToServer(client.GetStream());
         }
 
-        void ConnectToServer(string response)
+        async void ConnectToServer(string response)
         {
             rtbConsole.Text += response;
             string[] parameters = txtInput.Text.Split(":");
@@ -57,17 +57,24 @@ namespace LocalChat
             try
             {
                 // Attempt to connect to the server
-                client = new TcpClient(ipAddress.ToString(), port);
+                client = new TcpClient();
+                rtbConsole.Text += "\nAttempting to connect to server";
+                btnSend.Enabled = false;
+
+                // Wait only 2 seconds before displaying a message to the user if timed out
+                await client.ConnectAsync(ipAddress, port).WaitAsync(new TimeSpan(0, 0, 2));
                 rtbConsole.Text = "Connected to server.";
                 txtInput.Text = string.Empty;
+                btnSend.Enabled = true;
 
                 // Start reading messages in a async manner using a background worker
                 bwrReadMessages.RunWorkerAsync();
             }
-            catch (SocketException)
+            catch (Exception)
             {
                 rtbConsole.Text += "\nThere was a connection error, try again.";
                 rtbConsole.Text += "\n\nConnect to port: ";
+                btnSend.Enabled = true;
             }
         }
 
