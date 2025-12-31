@@ -45,7 +45,9 @@ namespace LocalChat
 
                 // Wait only 2 seconds before displaying a message to the user if timed out
                 await client.ConnectAsync(ipAddress, port).WaitAsync(new TimeSpan(0, 0, 2));
-                rtbConsole.Text = "Connected to server.";
+                rtbConsole.Text = string.Empty;
+                string message = $"\"{username}\" connected to server";
+                await SendMessageToServer(client.GetStream(), message);
                 txtInput.Text = string.Empty;
                 btnSend.Enabled = true;
 
@@ -60,11 +62,10 @@ namespace LocalChat
             }
         }
 
-        async Task SendMessageToServer(NetworkStream stream)
+        async Task SendMessageToServer(NetworkStream stream, string message)
         {
             try
             {
-                string message = $"[{username}]: " + txtInput.Text;
                 byte[] data = Encoding.ASCII.GetBytes(message);
 
                 // Send a message to the server in a asycnronous manner
@@ -89,7 +90,7 @@ namespace LocalChat
                 string response = Encoding.ASCII.GetString(buffer, 0, data);
 
                 // The GUI item is being accessed from a different thread so Invoke() is used
-                rtbConsole.Text += "\n" + response;
+                rtbConsole.Text += response + "\n";
             }
         }
 
@@ -116,7 +117,8 @@ namespace LocalChat
                 return;
             }
 
-            await SendMessageToServer(client.GetStream());
+            string message = $"[{username}]: " + txtInput.Text;
+            await SendMessageToServer(client.GetStream(), message);
         }
 
         private void btnExit_Click(object sender, EventArgs e)
