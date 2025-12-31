@@ -1,5 +1,3 @@
-using System.DirectoryServices.ActiveDirectory;
-using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -9,39 +7,23 @@ namespace LocalChat
     public partial class frmLocalChat : Form
     {
         TcpClient? client;
+        string connectToServerPrompt = "Connect to server (IP:port):";
+        string usernameDisplay = "Username: ";
+        static string username = Environment.MachineName;
 
         public frmLocalChat()
         {
             InitializeComponent();
         }
 
-        private void frmLocalChat_Load(object sender, EventArgs e)
-        {
-            rtbConsole.Text = "Connect to server (IP:port): ";
-        }
-
-        private async void btnSend_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtInput.Text))
-                return;
-
-            if (client == null || !client.Connected)
-            {
-                ConnectToServer(txtInput.Text);
-                return;
-            }
-
-            await SendMessageToServer(client.GetStream());
-        }
-
-        async void ConnectToServer(string response)
+        async Task ConnectToServer(string response)
         {
             rtbConsole.Text += response;
             string[] parameters = txtInput.Text.Split(":");
             if (parameters.Length != 2)
             {
                 rtbConsole.Text += "\nConnection string should be in (IP:port) format. (Ex: 192.168.1.1:6000)";
-                rtbConsole.Text += "\n\nConnect to server (IP:port):";
+                rtbConsole.Text += $"\n\n{connectToServerPrompt}:";
                 return;
             }
 
@@ -50,7 +32,7 @@ namespace LocalChat
 
             if (ipAddress == IPAddress.None || port == -1)
             {
-                rtbConsole.Text += "\n\nConnect to server (IP:port):";
+                rtbConsole.Text += $"\n\n{connectToServerPrompt}:";
                 return;
             }
 
@@ -68,12 +50,12 @@ namespace LocalChat
                 btnSend.Enabled = true;
 
                 // Start reading messages in a async manner using a background worker
-                bwrReadMessages.RunWorkerAsync();
+                await ReadMessagesAsync();
             }
             catch (Exception)
             {
                 rtbConsole.Text += "\nThere was a connection error, try again.";
-                rtbConsole.Text += "\n\nConnect to port: ";
+                rtbConsole.Text += $"\n\n{connectToServerPrompt}:";
                 btnSend.Enabled = true;
             }
         }
@@ -82,7 +64,8 @@ namespace LocalChat
         {
             try
             {
-                byte[] data = Encoding.ASCII.GetBytes(txtInput.Text);
+                string message = $"[{username}]: " + txtInput.Text;
+                byte[] data = Encoding.ASCII.GetBytes(message);
 
                 // Send a message to the server in a asycnronous manner
                 await stream.WriteAsync(data, 0, data.Length);
@@ -92,6 +75,85 @@ namespace LocalChat
             {
                 rtbConsole.Text += "\n" + e.Message;
             }
+        }
+
+        async Task ReadMessagesAsync()
+        {
+            while (true)
+            {
+                byte[] buffer = new byte[512];
+                if (client == null)
+                    break;
+
+                int data = await client.GetStream().ReadAsync(buffer, 0, buffer.Length);
+                string response = Encoding.ASCII.GetString(buffer, 0, data);
+
+                // The GUI item is being accessed from a different thread so Invoke() is used
+                rtbConsole.Text += "\n" + response;
+            }
+        }
+
+        private void frmLocalChat_Load(object sender, EventArgs e)
+        {
+            rtbConsole.Text = connectToServerPrompt;
+            if (string.IsNullOrWhiteSpace(Properties.Settings.Default.Username))
+            {
+                Properties.Settings.Default.Username = username;
+            }
+            
+            username = Properties.Settings.Default.Username;
+            lblUsername.Text = usernameDisplay + username;
+        }
+
+        private async void btnSend_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtInput.Text))
+                return;
+
+            if (client == null || !client.Connected)
+            {
+                await ConnectToServer(txtInput.Text);
+                return;
+            }
+
+            await SendMessageToServer(client.GetStream());
+        }
+
+        private void btnExit_Click(object sender, EventArgs e)
+        {
+            Application.Exit();
+        }
+
+        private async void changeUsernameMnuItm_Click(object sender, EventArgs e)
+        {
+            string oldUsername = username;
+            string newUsername = Microsoft.VisualBasic.Interaction.InputBox($"Enter new username\n\nCurrent: {username}", "Enter username", string.Empty);
+            if (string.IsNullOrWhiteSpace(newUsername))
+                return;
+
+            username = newUsername;
+            lblUsername.Text = usernameDisplay + username;
+            Properties.Settings.Default.Username = username;
+
+            if (client == null || !client.Connected)
+                return;
+
+            string message = $"[{oldUsername}] changed their name to [{newUsername}]";
+            byte[] data = Encoding.ASCII.GetBytes(message);
+
+            try
+            {
+                await client.GetStream().WriteAsync(data, 0, data.Length);
+            }
+            catch (Exception ex)
+            {
+                rtbConsole.Text += "\nUnable to broadcast message of name change.";
+            }
+        }
+
+        private void frmLocalChat_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            Properties.Settings.Default.Save();
         }
 
         int CheckPort(string num)
@@ -116,28 +178,6 @@ namespace LocalChat
             }
 
             return address;
-        }
-
-        private void btnExit_Click(object sender, EventArgs e)
-        {
-            Application.Exit();
-        }
-
-        private void bwrReadMessages_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
-        {
-            while (true)
-            {
-                byte[] buffer = new byte[512];
-                if (client == null)
-                    break;
-
-                // This Read() is done within a asyncronous background worker
-                int data = client.GetStream().Read(buffer, 0, buffer.Length);
-                string response = Encoding.ASCII.GetString(buffer, 0, data);
-
-                // The GUI item is being accessed from a different thread so Invoke() is used
-                rtbConsole.Invoke(() => rtbConsole.Text += "\n[CLIENT]: " + response);
-            }
         }
     }
 }

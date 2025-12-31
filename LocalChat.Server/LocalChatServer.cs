@@ -96,7 +96,7 @@ namespace LocalChat.Server
         async static Task BroadcastMessageAsync(byte[] response)
         {
             string responseData = Encoding.ASCII.GetString(response);
-            Console.WriteLine("[CLIENT]: " + responseData);
+            Console.WriteLine(responseData);
 
             try
             {
