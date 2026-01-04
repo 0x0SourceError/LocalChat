@@ -3,3 +3,7 @@
 /LocalChat.Server/obj
 /LocalChat/bin
 /LocalChat/obj
+/LocalChat.Encrypted/bin
+/LocalChat.Encrypted/obj
+/LocalChat.Server.Encrypted/bin
+/LocalChat.Server.Encrypted/obj

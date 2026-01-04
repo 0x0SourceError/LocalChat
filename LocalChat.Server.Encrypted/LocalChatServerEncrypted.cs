@@ -3,13 +3,14 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 
-namespace LocalChat.Server
+namespace LocalChat.Server.Encrypted
 {
-    internal class LocalChatServer
+    internal class LocalChatServerEncrypted
     {
-
-        static List<TcpClient> clients = new List<TcpClient>();
+        static X509Certificate2? certificate;
+        static List<SslStream> secureClients = new List<SslStream>();
 
         async static Task Main(string[] args)
         {
@@ -26,11 +27,36 @@ namespace LocalChat.Server
                     break;
             }
 
+            Console.WriteLine("Reading \"server.json\" file");
+            ServerDetails? serverDetails;
+            try
+            {
+                string path = Directory.GetCurrentDirectory() + "/server.json";
+                string contents = File.ReadAllText(path);
+                serverDetails = JsonSerializer.Deserialize<ServerDetails>(contents);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("\nserver.json file is missing or does not have correct information");
+                return;
+            }
+
+            // Use the certificate in the computer store along with the PFX file and export password
+            try
+            {
+                certificate = new X509Certificate2(serverDetails.ServerPfx, serverDetails.ExportPassword, X509KeyStorageFlags.MachineKeySet);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("There was an error reading the .pfx file or password specified in \"server.json\"");
+                return;
+            }
+
             using TcpListener server = new TcpListener(IPAddress.Any, port);
             try
             {
                 server.Start();
-                IPAddress address = await NetworkUtils.GetServerIPAddressAsync();
+                IPAddress address = await SslNetworkUtils.GetServerIPAddressAsync();
                 Console.WriteLine("Created server at IP: " + address.ToString() + " and Port: " + port);
                 Console.WriteLine("Waiting for clients...");
 
@@ -55,30 +81,21 @@ namespace LocalChat.Server
                 TcpClient client = await server.AcceptTcpClientAsync();
                 Console.WriteLine("Client connected!");
 
-                // Handle each client respectively
-                clients.Add(client);
-                _ = HandleClientAsync(client);
+                _ = HandleSecureClientAsync(client);
             }
         }
 
-        async static Task HandleClientAsync(TcpClient client)
+        async static Task HandleSecureClientAsync(TcpClient client)
         {
+            SslStream clientStream = new SslStream(client.GetStream());
+            secureClients.Add(clientStream);
             try
             {
+                clientStream.AuthenticateAsServer(certificate, false, true);
                 while (true)
                 {
-                    byte[] buffer = new byte[512];
-
-                    // Read the data coming from each client in a asynchronous manner
-                    int data = await client.GetStream().ReadAsync(buffer, 0, buffer.Length);
-                    if (data == 0)
-                        break;
-
-                    string response = Encoding.ASCII.GetString(buffer, 0, data);
-                    byte[] responseData = Encoding.ASCII.GetBytes(response);
-
-                    // Handles broadcasting the message the client sent to all clients
-                    await BroadcastMessageAsync(responseData);
+                    byte[] message = await SslNetworkUtils.ReadFrameAsync(clientStream);
+                    await BroadcastSecureMessageAsync(message);
                 }
             }
             catch (IOException)
@@ -92,22 +109,23 @@ namespace LocalChat.Server
             finally
             {
                 // Terminate the connection and remove the client from the list of clients
-                client.Close();
-                clients.Remove(client);
+                clientStream.Close();
+                secureClients.Remove(clientStream);
             }
         }
 
-        async static Task BroadcastMessageAsync(byte[] response)
+
+        async static Task BroadcastSecureMessageAsync(byte[] response)
         {
             string responseData = Encoding.ASCII.GetString(response);
             Console.WriteLine(responseData);
 
             try
             {
-                foreach (TcpClient c in clients)
+                foreach (SslStream ssl in secureClients)
                 {
                     // Asyncronously write the clients message to all clients
-                    await c.GetStream().WriteAsync(response);
+                    await SslNetworkUtils.WriteFrameAsync(ssl, response);
                 }
             }
             catch (Exception e)

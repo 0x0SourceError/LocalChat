@@ -1,4 +1,6 @@
-﻿namespace LocalChat
+﻿using System.Windows.Forms;
+
+namespace LocalChat.Encrypted
 {
     partial class frmLocalChat
     {
@@ -131,7 +133,7 @@
             MainMenuStrip = menuStrip1;
             MinimumSize = new Size(608, 319);
             Name = "frmLocalChat";
-            Text = "Local Chat";
+            Text = "Local Chat (Encrypted)";
             FormClosing += frmLocalChat_FormClosing;
             Load += frmLocalChat_Load;
             menuStrip1.ResumeLayout(false);
@@ -141,7 +143,6 @@
         }
 
         #endregion
-
         private RichTextBox rtbConsole;
         private Label label1;
         private TextBox txtInput;

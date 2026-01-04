@@ -1,8 +1,13 @@
-﻿using System.Net;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace LocalChat.Server
 {
-    static class NetworkUtils
+    public static class NetworkUtils
     {
         public async static Task<IPAddress> GetServerIPAddressAsync()
         {

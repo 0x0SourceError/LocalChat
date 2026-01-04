@@ -3,13 +3,14 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using LocalChat.Server.Encrypted;
 
-namespace LocalChat
+namespace LocalChat.Encrypted
 {
     public partial class frmLocalChat : Form
     {
         TcpClient? client;
-        NetworkStream clientStream;
+        SslStream secureClientStream;
         string connectToServerPrompt = "Connect to server (IP:port):";
         string usernameDisplay = "Username: ";
         static string username = Environment.MachineName;
@@ -19,13 +20,22 @@ namespace LocalChat
             InitializeComponent();
         }
 
+        bool ValidateServerCertificate(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors errors)
+        {
+            if (errors == SslPolicyErrors.None)
+                return true;
+
+            rtbConsole.Text += "\nCertificate error: " + errors;
+            rtbConsole.Text += $"\n\n{connectToServerPrompt} ";
+            return false;
+        }
+
         async Task ConnectToServer(string response)
         {
             object[] data = ValidateData(response);
             if (data.Length < 2)
             {
-                rtbConsole.Text += "\nConnection string should be in (IP:port) format. (Ex: 192.168.1.1:6000)";
-                rtbConsole.Text += $"\n\n{connectToServerPrompt}:";
+                rtbConsole.Text += "asdasdasdasd";
                 return;
             }
 
@@ -44,14 +54,16 @@ namespace LocalChat
                 rtbConsole.Text = string.Empty;
                 string message = $"\"{username}\" connected to server";
 
-                clientStream = client.GetStream();
-                await SendMessageToServer(clientStream, message);
+                // Authenticate the client with the server and send a message to them
+                secureClientStream = new SslStream(client.GetStream(), false, new RemoteCertificateValidationCallback(ValidateServerCertificate), null);
+                await secureClientStream.AuthenticateAsClientAsync("domain");
+                await SendSecureMessageToServer(secureClientStream, message);
 
                 txtInput.Text = string.Empty;
                 btnSend.Enabled = true;
 
                 // Start reading messages in a async manner
-                await ReadMessagesAsync();
+                await ReadSecureMessagesAsync();
             }
             catch (Exception e)
             {
@@ -61,14 +73,13 @@ namespace LocalChat
             }
         }
 
-        async Task SendMessageToServer(NetworkStream stream, string message)
+        async Task SendSecureMessageToServer(SslStream stream, string message)
         {
             try
             {
+                // Write the data in frames
                 byte[] data = Encoding.ASCII.GetBytes(message);
-
-                // Send a message to the server in a asycnronous manner
-                await stream.WriteAsync(data, 0, data.Length);
+                await SslNetworkUtils.WriteFrameAsync(stream, data);
                 txtInput.Text = string.Empty;
             }
             catch (Exception e)
@@ -77,18 +88,14 @@ namespace LocalChat
             }
         }
 
-        async Task ReadMessagesAsync()
+        async Task ReadSecureMessagesAsync()
         {
             while (true)
             {
-                byte[] buffer = new byte[512];
-                if (client == null)
-                    break;
+                // Read the data that comes back from the server
+                byte[] message = await SslNetworkUtils.ReadFrameAsync(secureClientStream);
+                string response = Encoding.ASCII.GetString(message);
 
-                int data = await client.GetStream().ReadAsync(buffer, 0, buffer.Length);
-                string response = Encoding.ASCII.GetString(buffer, 0, data);
-
-                // The GUI item is being accessed from a different thread so Invoke() is used
                 rtbConsole.Text += response + "\n";
             }
         }
@@ -100,7 +107,7 @@ namespace LocalChat
             {
                 Properties.Settings.Default.Username = username;
             }
-            
+
             username = Properties.Settings.Default.Username;
             lblUsername.Text = usernameDisplay + username;
         }
@@ -117,7 +124,7 @@ namespace LocalChat
             }
 
             string message = $"[{username}]: " + txtInput.Text;
-            await SendMessageToServer(client.GetStream(), message);
+            await SendSecureMessageToServer(secureClientStream, message);
         }
 
         private void btnExit_Click(object sender, EventArgs e)
@@ -136,7 +143,7 @@ namespace LocalChat
             lblUsername.Text = usernameDisplay + username;
             Properties.Settings.Default.Username = username;
 
-            if (client == null || !client.Connected)
+            if (client == null || !client.Connected || secureClientStream == null)
                 return;
 
             string message = $"[{oldUsername}] changed their name to [{newUsername}]";
@@ -144,7 +151,7 @@ namespace LocalChat
 
             try
             {
-                await client.GetStream().WriteAsync(data, 0, data.Length);
+                await SslNetworkUtils.WriteFrameAsync(secureClientStream, data);
             }
             catch (Exception ex)
             {
