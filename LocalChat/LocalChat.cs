@@ -24,8 +24,6 @@ namespace LocalChat
             object[] data = ValidateData(response);
             if (data.Length < 2)
             {
-                rtbConsole.Text += "\nConnection string should be in (IP:port) format. (Ex: 192.168.1.1:6000)";
-                rtbConsole.Text += $"\n\n{connectToServerPrompt}:";
                 return;
             }
 

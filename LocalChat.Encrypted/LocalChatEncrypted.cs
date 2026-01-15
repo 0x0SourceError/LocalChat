@@ -35,7 +35,6 @@ namespace LocalChat.Encrypted
             object[] data = ValidateData(response);
             if (data.Length < 2)
             {
-                rtbConsole.Text += "asdasdasdasd";
                 return;
             }
 
